@@ -188,24 +188,27 @@ export default function Camera() {
   }
 
   // Capture photo
-  function capturePhoto() {
-    const video = videoRef.current;
-    const canvas = canvasRef.current;
-    const frame = frameImageRef.current;
+  
+function capturePhoto() {
+  const video = videoRef.current;
+  const canvas = canvasRef.current;
+  const frame = frameImageRef.current;
 
-    if (
-      !cameraReady ||
-      !frameReady ||
-      !video ||
-      !canvas ||
-      !frame ||
-      !frame.complete ||
-      !frame.naturalWidth ||
-      !video.videoWidth
-    ) {
-      return;
-    }
+  if (
+    !cameraReady ||
+    !frameReady ||
+    !video ||
+    !canvas ||
+    !frame ||
+    !frame.complete ||
+    !frame.naturalWidth ||
+    !video.videoWidth ||
+    !video.videoHeight
+  ) {
+    return;
+  }
 
+  try {
     const width = 1200;
     const height = Math.round(
       width * (frameSize.height / frameSize.width)
@@ -215,6 +218,10 @@ export default function Camera() {
     canvas.height = height;
 
     const ctx = canvas.getContext("2d");
+
+    if (!ctx) {
+      throw new Error("Canvas not supported");
+    }
 
     ctx.save();
 
@@ -226,13 +233,19 @@ export default function Camera() {
     drawVideoCover(ctx, video, width, height);
     ctx.restore();
 
-    // Draw the exact same frame on top
+    // Draw selected frame
     ctx.drawImage(frame, 0, 0, width, height);
 
-    const photo = canvas.toDataURL("image/png");
+    // Compress photo to reduce mobile storage usage
+    const photo = canvas.toDataURL("image/jpeg", 0.90);
 
-    sessionStorage.setItem("capturedPhoto", photo);
-    sessionStorage.setItem("capturedFrame", photoFrame.id);
+    // Navigate even if sessionStorage is full
+    try {
+      sessionStorage.setItem("capturedPhoto", photo);
+      sessionStorage.setItem("capturedFrame", photoFrame.id);
+    } catch (storageError) {
+      console.warn("Photo storage unavailable:", storageError);
+    }
 
     navigate("/preview", {
       state: {
@@ -240,7 +253,12 @@ export default function Camera() {
         frameId: photoFrame.id,
       },
     });
+  } catch (error) {
+    console.error("Photo capture failed:", error);
+    alert("Photo capture failed. Please try again.");
   }
+}
+
 
   return (
     <main className="fixed inset-0 z-50 flex h-[100svh] w-full justify-center overflow-hidden bg-[#111] text-white">
