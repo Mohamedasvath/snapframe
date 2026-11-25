@@ -7,11 +7,11 @@ import {
   SwitchCamera,
   Camera as CameraIcon,
   RefreshCw,
+  ShieldAlert,
 } from "lucide-react";
 
 const photoFrames = [
   { id: "meelaban", image: "/frames/meelaban.png", name: "meelaban" },
-  
 ];
 
 function getUsedFrames() {
@@ -46,7 +46,11 @@ function getRandomFrame() {
 function MeeLabanCloudBadge() {
   return (
     <div className="relative inline-flex items-center justify-center select-none pointer-events-none">
-      <svg className="w-36 sm:w-40 h-auto drop-shadow-[0_6px_14px_rgba(0,86,214,0.45)]" viewBox="0 0 320 150" fill="none">
+      <svg
+        className="w-32 sm:w-36 h-auto drop-shadow-[0_6px_14px_rgba(0,86,214,0.45)]"
+        viewBox="0 0 320 150"
+        fill="none"
+      >
         <path d="M58 42C48 25 36 16 32 22C28 28 38 45 50 52C55 55 61 48 58 42Z" fill="#FFC700" />
         <path d="M35 65C22 60 8 62 8 68C8 74 22 76 34 73C39 72 40 67 35 65Z" stroke="#0044AA" strokeWidth="3" fill="white" />
         <path d="M262 42C272 25 284 16 288 22C292 28 282 45 270 52C265 55 259 48 262 42Z" fill="#FFC700" />
@@ -61,8 +65,8 @@ function MeeLabanCloudBadge() {
         />
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center pt-1.5 text-white">
-        <span className="font-display font-bold text-lg sm:text-xl leading-none">Mee</span>
-        <span className="font-display font-bold text-lg sm:text-xl tracking-wider leading-none -mt-0.5">LABAN</span>
+        <span className="font-display font-bold text-base sm:text-lg leading-none">Mee</span>
+        <span className="font-display font-bold text-base sm:text-lg tracking-wider leading-none -mt-0.5">LABAN</span>
       </div>
     </div>
   );
@@ -82,10 +86,37 @@ export default function Camera() {
   const [flashOn, setFlashOn] = useState(false);
   const [flashTrigger, setFlashTrigger] = useState(false);
   const [cameraReady, setCameraReady] = useState(false);
-  const [frameReady, setFrameReady] = useState(false);
+  const [permissionState, setPermissionState] = useState("checking"); // 'checking' | 'prompt' | 'granted' | 'denied'
   const [errorMessage, setErrorMessage] = useState("");
   const [retry, setRetry] = useState(0);
-  const [frameSize, setFrameSize] = useState({ width: 4, height: 5 });
+  const [frameSize, setFrameSize] = useState({ width: 1080, height: 1350 });
+
+  // Check browser camera permission status proactively
+  useEffect(() => {
+    let permissionStatus;
+    async function checkPermission() {
+      if (navigator.permissions && navigator.permissions.query) {
+        try {
+          permissionStatus = await navigator.permissions.query({ name: "camera" });
+          setPermissionState(permissionStatus.state);
+          permissionStatus.onchange = () => {
+            setPermissionState(permissionStatus.state);
+            if (permissionStatus.state === "granted") {
+              setRetry((r) => r + 1);
+            }
+          };
+        } catch {
+          setPermissionState("prompt");
+        }
+      } else {
+        setPermissionState("prompt");
+      }
+    }
+    checkPermission();
+    return () => {
+      if (permissionStatus) permissionStatus.onchange = null;
+    };
+  }, []);
 
   useEffect(() => {
     const currentRequestId = ++requestIdRef.current;
@@ -106,9 +137,7 @@ export default function Camera() {
       setErrorMessage("");
 
       if (!window.isSecureContext) {
-        setErrorMessage(
-          "Camera requires HTTPS or localhost. Open via HTTPS link or localhost."
-        );
+        setErrorMessage("Camera requires HTTPS or localhost.");
         return;
       }
 
@@ -120,7 +149,6 @@ export default function Camera() {
       try {
         let stream;
         try {
-          // 1st attempt: Preferred resolution & facingMode
           stream = await navigator.mediaDevices.getUserMedia({
             video: {
               facingMode: { ideal: facingMode },
@@ -130,20 +158,32 @@ export default function Camera() {
             audio: false,
           });
         } catch {
-          // 2nd attempt: Universal fallback for strict devices/webcams
           stream = await navigator.mediaDevices.getUserMedia({
             video: true,
             audio: false,
           });
         }
 
-        // Ignore stale request if component re-mounted or user switched camera
         if (requestIdRef.current !== currentRequestId) {
           stream.getTracks().forEach((track) => track.stop());
           return;
         }
 
+        const videoTrack = stream.getVideoTracks()[0];
+        if (!videoTrack || videoTrack.readyState === "ended") {
+          setCameraReady(false);
+          setErrorMessage("Camera is turned off or blocked in device settings. Turn on your camera and tap Allow.");
+          return;
+        }
+
+        // Listen if user turns off/blocks camera while open
+        videoTrack.onended = () => {
+          setCameraReady(false);
+          setErrorMessage("Camera disconnected or turned off. Please enable camera access.");
+        };
+
         streamRef.current = stream;
+        setPermissionState("granted");
 
         const video = videoRef.current;
         if (!video) return;
@@ -157,25 +197,25 @@ export default function Camera() {
           try {
             await video.play();
             setCameraReady(true);
-          } catch (playErr) {
-            console.error("Video play failed:", playErr);
-            setErrorMessage("Tap 'Enable Camera' below to start the preview.");
+          } catch {
+            setErrorMessage("Camera permission needed. Tap 'Allow Camera' below.");
           }
         };
       } catch (err) {
         if (requestIdRef.current !== currentRequestId) return;
-        console.error("Camera permission error:", err);
+        setCameraReady(false);
 
         if (err.name === "NotAllowedError" || err.name === "PermissionDeniedError") {
+          setPermissionState("denied");
           setErrorMessage(
-            "Camera permission was blocked. Click the lock/camera icon in your browser address bar, select Allow, and tap Retry."
+            "Camera permission is blocked. Click the camera/lock icon in your browser address bar, choose Allow, then tap Allow Camera."
           );
         } else if (err.name === "NotFoundError" || err.name === "DevicesNotFoundError") {
-          setErrorMessage("No camera device found on this phone/PC.");
+          setErrorMessage("No active camera found. Connect or enable your webcam and retry.");
         } else if (err.name === "NotReadableError" || err.name === "TrackStartError") {
-          setErrorMessage("Camera is currently in use by another app. Close other apps and retry.");
+          setErrorMessage("Camera is busy in another app or turned off by laptop privacy switch.");
         } else {
-          setErrorMessage("Unable to access camera. Please check browser permissions.");
+          setErrorMessage("Please allow camera permission to use Mee Laban Booth.");
         }
       }
     }
@@ -190,11 +230,12 @@ export default function Camera() {
 
   function handleFrameLoad(event) {
     const image = event.currentTarget;
-    setFrameSize({
-      width: image.naturalWidth,
-      height: image.naturalHeight,
-    });
-    setFrameReady(true);
+    if (image.naturalWidth && image.naturalHeight) {
+      setFrameSize({
+        width: image.naturalWidth,
+        height: image.naturalHeight,
+      });
+    }
   }
 
   function switchCamera() {
@@ -222,7 +263,6 @@ export default function Camera() {
     sessionStorage.setItem("usedPhotoFrames", JSON.stringify(used));
     sessionStorage.setItem("activePhotoFrame", nextFrame.id);
 
-    setFrameReady(false);
     setPhotoFrame(nextFrame);
   }
 
@@ -242,6 +282,7 @@ export default function Camera() {
     const frame = frameImageRef.current;
 
     if (!cameraReady || !video || !canvas || !video.videoWidth || !video.videoHeight) {
+      setRetry((r) => r + 1);
       return;
     }
 
@@ -303,7 +344,7 @@ export default function Camera() {
 
       <div className="relative mx-auto flex h-full w-full max-w-[460px] flex-col justify-between bg-[#0E1117] shadow-2xl overflow-hidden">
         {/* TOP HEADER */}
-        <header className="relative z-30 flex h-[74px] shrink-0 items-center justify-between px-5 pt-2">
+        <header className="relative z-30 flex h-[68px] shrink-0 items-center justify-between px-5 pt-2">
           <button
             onClick={() => navigate("/")}
             aria-label="Back to Home"
@@ -312,7 +353,7 @@ export default function Camera() {
             <ArrowLeft size={22} strokeWidth={2.2} />
           </button>
 
-          <div className="translate-y-3 z-30">
+          <div className="translate-y-2 z-30">
             <MeeLabanCloudBadge />
           </div>
 
@@ -327,24 +368,32 @@ export default function Camera() {
           </button>
         </header>
 
-        {/* CAMERA VIEWFINDER */}
-        <section className="relative z-20 flex min-h-0 flex-1 items-center justify-center px-3.5 py-1">
+        {/* CAMERA VIEWFINDER WITH FULL-FIT FRAME */}
+        <section className="relative z-20 flex min-h-0 flex-1 items-center justify-center px-3 py-1">
           <div
-            className="relative h-auto w-full max-h-full max-w-full overflow-hidden rounded-[26px] border-[3px] border-[#0066FF] bg-[#161B24] shadow-[0_0_30px_rgba(0,102,255,0.3)]"
+            className="relative flex items-center justify-center overflow-hidden rounded-[22px]"
             style={{
               aspectRatio: `${frameSize.width} / ${frameSize.height}`,
+              height: "100%",
+              maxHeight: "100%",
+              width: "auto",
+              maxWidth: "100%",
             }}
           >
-            <video
-              ref={videoRef}
-              autoPlay
-              playsInline
-              muted
-              className={`absolute inset-0 h-full w-full object-cover ${
-                facingMode === "user" ? "-scale-x-100" : ""
-              }`}
-            />
+            {/* 1. Live Camera Feed (Inset inside the frame window so edges don't bleed outside PNG cutouts) */}
+            <div className="absolute inset-[6%] z-10 overflow-hidden rounded-[24px] bg-[#161B24]">
+              <video
+                ref={videoRef}
+                autoPlay
+                playsInline
+                muted
+                className={`h-full w-full object-cover ${
+                  facingMode === "user" ? "-scale-x-100" : ""
+                }`}
+              />
+            </div>
 
+            {/* 2. PNG Template Overlay (Edge-to-Edge Fit) */}
             {photoFrame && (
               <img
                 key={photoFrame.id}
@@ -352,48 +401,40 @@ export default function Camera() {
                 src={photoFrame.image}
                 alt={photoFrame.name}
                 onLoad={handleFrameLoad}
-                onError={() => {
-                  setFrameReady(true); // Allow capture even if frame asset is missing
-                  console.error("Frame not found:", photoFrame.image);
-                }}
-                className="pointer-events-none absolute inset-0 z-20 h-full w-full object-fill"
+                onError={() => console.error("Frame not found:", photoFrame.image)}
+                className="pointer-events-none relative z-20 h-full w-full object-contain select-none"
               />
             )}
 
-            {/* Bottom Milk Rim inside Viewfinder */}
-            <svg
-              className="pointer-events-none absolute bottom-0 left-0 right-0 z-20 w-full h-7 text-white/95"
-              viewBox="0 0 400 32"
-              preserveAspectRatio="none"
-            >
-              <path
-                fill="currentColor"
-                d="M0,18 C45,28 85,8 140,20 C195,30 245,10 300,22 C345,30 375,16 400,14 L400,32 L0,32 Z"
-              />
-            </svg>
-
-            {/* Starting State */}
-            {!cameraReady && !errorMessage && (
-              <div className="absolute inset-0 z-30 flex flex-col items-center justify-center bg-[#0E1117]/95">
-                <CameraIcon size={38} className="animate-pulse text-[#0066FF]" />
-                <p className="mt-3 text-xs font-medium text-white/75">Starting Mee Laban Booth...</p>
-              </div>
-            )}
-
-            {/* Clear Actionable Permission Error State */}
-            {errorMessage && (
-              <div className="absolute inset-0 z-40 flex flex-col items-center justify-center bg-[#0E1117]/95 px-6 text-center">
-                <div className="flex h-14 w-14 items-center justify-center rounded-full bg-[#0056D6]/20 text-[#FFC700]">
-                  <CameraIcon size={30} />
+            {/* Asking Camera Permission / Starting Overlay */}
+            {(!cameraReady || errorMessage) && (
+              <div className="absolute inset-[8%] z-30 flex flex-col items-center justify-center rounded-[22px] bg-[#0E1117]/95 px-5 text-center backdrop-blur-md">
+                <div className="flex h-14 w-14 items-center justify-center rounded-full bg-[#0056D6]/25 text-[#FFC700]">
+                  {errorMessage || permissionState === "denied" ? (
+                    <ShieldAlert size={30} />
+                  ) : (
+                    <CameraIcon size={30} className="animate-pulse text-[#0A66FF]" />
+                  )}
                 </div>
-                <p className="mt-3 text-sm font-bold text-white">Camera Access Needed</p>
-                <p className="mt-1.5 text-xs text-white/70 leading-relaxed">{errorMessage}</p>
+
+                <p className="mt-3 text-sm font-bold text-white">
+                  {errorMessage || permissionState === "denied"
+                    ? "Camera Permission Required"
+                    : "Allow Camera Access"}
+                </p>
+
+                <p className="mt-1.5 text-xs text-white/75 leading-relaxed">
+                  {errorMessage
+                    ? errorMessage
+                    : "Please allow camera permission in your browser popup to take your Mee Laban photo."}
+                </p>
+
                 <button
                   onClick={() => setRetry((value) => value + 1)}
-                  className="mt-5 inline-flex items-center gap-2 rounded-full bg-[#0056D6] hover:bg-[#0A66FF] px-6 py-2.5 text-xs font-bold text-white shadow-lg cursor-pointer"
+                  className="mt-4 inline-flex items-center gap-2 rounded-full bg-[#0056D6] hover:bg-[#0A66FF] px-5 py-2.5 text-xs font-bold text-white shadow-lg transition active:scale-95 cursor-pointer"
                 >
                   <RefreshCw size={14} />
-                  <span>Enable / Retry Camera</span>
+                  <span>Allow Camera</span>
                 </button>
               </div>
             )}
@@ -401,7 +442,7 @@ export default function Camera() {
         </section>
 
         {/* BOTTOM CONTROLS */}
-        <footer className="relative z-30 flex h-[126px] shrink-0 items-center justify-between px-9 pb-5">
+        <footer className="relative z-30 flex h-[118px] shrink-0 items-center justify-between px-9 pb-5">
           <button
             onClick={switchFrame}
             aria-label="Change Frame"
@@ -415,9 +456,10 @@ export default function Camera() {
 
           <button
             onClick={capturePhoto}
-            disabled={!cameraReady}
             aria-label="Capture photo"
-            className="flex h-[78px] w-[78px] items-center justify-center rounded-full border-[4px] border-white p-1 transition hover:scale-105 active:scale-90 disabled:opacity-40 cursor-pointer shadow-[0_0_25px_rgba(255,255,255,0.25)]"
+            className={`flex h-[76px] w-[76px] items-center justify-center rounded-full border-[4px] border-white p-1 transition hover:scale-105 active:scale-90 cursor-pointer shadow-[0_0_25px_rgba(255,255,255,0.25)] ${
+              !cameraReady ? "opacity-50" : ""
+            }`}
           >
             <span className="h-full w-full rounded-full bg-white" />
           </button>
