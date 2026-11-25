@@ -14,6 +14,7 @@ import {
   Clock,
   Star
 } from 'lucide-react';
+import QR from '../../public/QR.jpeg'
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -318,7 +319,7 @@ const Hero = ({ children }) => {
           >
             <div className="relative aspect-[16/11] w-full overflow-hidden rounded-xl bg-blue-100">
               <img
-                src="https://fromykitchen.com/wp-content/uploads/2021/05/20210325_183620-683x1024-1-683x500.jpg"
+                src={QR}
                 alt="Friends smiling at Mee Laban Photo Booth"
                 className="w-full h-full object-cover"
               />
@@ -387,65 +388,7 @@ const Hero = ({ children }) => {
       {/* =========================================================
           SECTION 3: SIGNATURE DESSERT + BOOTH COMBOS
       ========================================================= */}
-      <section id="combos" className="relative py-20 px-4 sm:px-8 bg-[#0056D6] text-white overflow-hidden">
-        <svg className="absolute top-0 left-0 w-full h-10 sm:h-16 text-white" viewBox="0 0 1440 80" preserveAspectRatio="none">
-          <path fill="currentColor" d="M0,0 L1440,0 L1440,30 C1120,85 820,-15 480,45 C240,85 110,40 0,20 Z" />
-        </svg>
-
-        <div className="max-w-6xl mx-auto pt-8">
-          <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-12">
-            <div>
-              <span className="inline-flex items-center gap-1.5 px-4 py-1 rounded-full bg-white/15 text-[#FFC700] font-display font-semibold text-sm">
-                <Crown className="w-4 h-4" />
-                <span>Dessert + Photo Combos</span>
-              </span>
-              <h2 className="mt-3 font-script font-bold text-5xl sm:text-6xl text-white">Sweetest Booth Passes</h2>
-            </div>
-            <p className="text-blue-100 max-w-md text-sm sm:text-base">
-              Order any signature Mee Laban cup and unlock instant booth tokens with custom royal-blue frames.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {menuCombos.map((item) => (
-              <motion.div
-                key={item.name}
-                whileHover={{ y: -8 }}
-                className="reveal-card bg-white text-[#0B192C] rounded-3xl overflow-hidden shadow-[0_20px_45px_rgba(0,22,66,0.35)] flex flex-col"
-              >
-                <div className="relative h-56 overflow-hidden">
-                  <img
-                    src={item.img}
-                    alt={item.name}
-                    className="w-full h-full object-cover transition-transform duration-500 hover:scale-105"
-                  />
-                  <span className="absolute top-3.5 left-3.5 bg-[#FFC700] text-[#0B192C] font-display font-bold text-xs px-3.5 py-1.5 rounded-full shadow">
-                    {item.tag}
-                  </span>
-                </div>
-
-                <div className="p-6 flex-1 flex flex-col justify-between">
-                  <div>
-                    <div className="flex items-start justify-between gap-2">
-                      <h3 className="font-display font-bold text-xl leading-snug">{item.name}</h3>
-                      <span className="font-display font-bold text-xl text-[#0056D6] shrink-0">{item.price}</span>
-                    </div>
-                    <p className="mt-2 text-sm text-[#1E3A6D]/80 leading-relaxed">{item.desc}</p>
-                  </div>
-
-                  <button
-                    onClick={() => navigate('/camera')}
-                    className="mt-6 w-full py-3 rounded-2xl bg-[#EBF3FF] hover:bg-[#0056D6] text-[#0056D6] hover:text-white font-display font-bold text-sm transition-colors flex items-center justify-center gap-2 cursor-pointer"
-                  >
-                    <Camera className="w-4 h-4" />
-                    <span>Open Booth Camera</span>
-                  </button>
-                </div>
-              </motion.div>
-            ))}
-          </div>
-        </div>
-      </section>
+     
 
       {/* =========================================================
           SECTION 4: LIVE POLAROID MEMORY WALL
