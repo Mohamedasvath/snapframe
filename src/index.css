@@ -1,0 +1,28 @@
+@import "tailwindcss";
+
+
+
+
+
+@layer base {
+  body {
+    background-color: #FFFDF7;
+    color: #0B192C;
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    overflow-x: hidden;
+  }
+}
+
+.font-display {
+  font-family: 'Fredoka', sans-serif;
+}
+
+.font-script {
+  font-family: 'Caveat', cursive;
+}
+
+/* Custom 3D Button Shadow matching the poster */
+.btn-laban {
+  background: linear-gradient(180deg, #0A66FF 0%, #0047B3 100%);
+  box-shadow: 0 10px 25px -5px rgba(0, 82, 212, 0.5), inset 0 2px 2px rgba(255, 255, 255, 0.4);
+}
